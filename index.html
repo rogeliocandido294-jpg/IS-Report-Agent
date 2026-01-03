@@ -24,10 +24,10 @@
     <h1 style="text-align: center; color: var(--primary);">📋 IS Report Agent</h1>
     
     <div class="grid">
-        <div class="form-group full-width"><label>Name of School:</label><input type="text" id="schoolName" value="San Jose National High School"></div>
-        <div class="form-group"><label>School Head:</label><input type="text" id="schoolHead" value="Rogelio B. Candido Jr."></div>
-        <div class="form-group"><label>Teacher Name:</label><input type="text" id="teacherName"></div>
-        <div class="form-group"><label>Subject / Grade Level:</label><input type="text" id="subject"></div>
+        <div class="form-group full-width"><label>Name of School:</label><input type="text" id="schoolName" placeholder="Enter School Name"></div>
+        <div class="form-group"><label>School Head:</label><input type="text" id="schoolHead" placeholder="Enter Name of School Head"></div>
+        <div class="form-group"><label>Teacher Name:</label><input type="text" id="teacherName" placeholder="Enter Teacher Name"></div>
+        <div class="form-group"><label>Subject / Grade Level:</label><input type="text" id="subject" placeholder="e.g. Mathematics / Grade 3"></div>
         <div class="form-group">
             <label>Career Stage:</label>
             <select id="careerStage">
@@ -36,15 +36,14 @@
             </select>
         </div>
         <div class="form-group"><label>Date of Observation:</label><input type="date" id="obsDate"></div>
-        <div class="form-group full-width"><label>Raw Observation Notes:</label><textarea id="obsNotes" rows="12"></textarea></div>
+        <div class="form-group full-width"><label>Raw Observation Notes:</label><textarea id="obsNotes" rows="12" placeholder="Paste observation notes here..."></textarea></div>
     </div>
 
-    <button id="genBtn">📥 GENERATE WORD REPORT</button>
+    <button id="genBtn">🚀 GENERATE WORD REPORT</button>
     <div id="status"></div>
 </div>
 
 <script>
-    // Ilagay dito ang iyong API Key
     const MY_KEY = "AIzaSyBprGO0cDuLsGVFHka52yxYUJ1_iCMPk9I";
 
     async function callGemini(prompt) {
@@ -69,26 +68,46 @@
         status.innerText = "⏳ AI is processing evidence-based report...";
 
         const masterPrompt = `
-        ROLE: Expert in Instructional Supervision [cite: 4]
-        RULES: Use classroom-observable evidence only[cite: 9]. No theory/motivational language[cite: 14]. Evidence first, interpretation second[cite: 12].
-        RATING RULES: If Proficient (T1-T3), allow 3-7 [cite: 17-18]. If Highly Proficient (MT1-MT4), allow 4-8 [cite: 19-20]. Mark NE if absent[cite: 21].
+        ROLE: Expert in Instructional Supervision assisting a Philippine School Head[cite: 4].
+        NON-NEGOTIABLE RULES: 
+        1. Use classroom-observable evidence only[cite: 9]. 
+        2. Do not infer intentions or motives[cite: 10]. 
+        3. If evidence is absent, mark NE[cite: 11]. 
+        4. No theory or motivational language[cite: 14].
+        
+        RATING RULES: 
+        - If Career Stage is Proficient (T1-T3), allowed ratings are 3, 4, 5, 6, 7[cite: 17, 18].
+        - If Career Stage is Highly Proficient (MT1-MT4), allowed ratings are 4, 5, 6, 7, 8[cite: 19, 20].
         
         ADMIN DETAILS:
+        School: ${document.getElementById('schoolName').value}
         School Head: ${document.getElementById('schoolHead').value}
         Teacher: ${document.getElementById('teacherName').value}
         Stage: ${document.getElementById('careerStage').value}
         Subject: ${document.getElementById('subject').value}
         Date: ${document.getElementById('obsDate').value}
         
-        RAW NOTES: ${notes}
+        RAW NOTES: ${notes} [cite: 33-46]
         
-        OUTPUT STRUCTURE: Generate the full report exactly following sections 1 to 12 [cite: 47-96].
+        OUTPUT STRUCTURE: Follow sections 1 to 12 exactly [cite: 47-96].
+        1. Instructional Snapshot [cite: 49]
+        2. Observation Evidence Log [cite: 51]
+        3. PPST Rating Table [cite: 53, 54]
+        4. Synthesis of Instructional Patterns [cite: 60]
+        5. Critical Instructional Incidents [cite: 62]
+        6. Key Instructional Strengths [cite: 68]
+        7. Priority Instructional Gaps [cite: 73]
+        8. Post-Observation Conference Guide [cite: 78]
+        9. Technical Assistance (TA) Action Plan [cite: 85]
+        10. Performance Level Clarification [cite: 88]
+        11. School Head PPSSH Alignment [cite: 90]
+        12. RPMS Portfolio Guidance [cite: 95]
         `;
 
         try {
             const aiText = await callGemini(masterPrompt);
             
-            const { Document, Packer, Paragraph, TextRun, HeadingLevel } = docx;
+            const { Document, Packer, Paragraph, TextRun } = docx;
             const doc = new Document({
                 sections: [{
                     children: aiText.split('\n').map(line => {
@@ -104,7 +123,7 @@
             saveAs(blob, `IS_Report_${document.getElementById('teacherName').value}.docx`);
             status.innerText = "✅ Report Downloaded!";
         } catch (err) {
-            status.innerText = "❌ Error in processing. Check your connection.";
+            status.innerText = "❌ Error in processing.";
             console.error(err);
         } finally {
             btn.disabled = false;
