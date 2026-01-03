@@ -14,8 +14,9 @@
         input, select, textarea { width: 100%; padding: 12px; border: 1px solid #bdc3c7; border-radius: 6px; box-sizing: border-box; margin-top: 5px; }
         .full-width { grid-column: span 2; }
         button { background: var(--secondary); color: white; padding: 18px; border: none; border-radius: 6px; width: 100%; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 25px; transition: 0.3s; }
-        button:hover { background: #219150; }
-        #status { margin-top: 15px; font-weight: bold; text-align: center; color: var(--primary); }
+        button:disabled { background: #bdc3c7; cursor: not-allowed; }
+        #status { margin-top: 15px; font-weight: bold; text-align: center; }
+        .error-msg { color: #e74c3c; background: #fdedec; padding: 10px; border-radius: 5px; border: 1px solid #e74c3c; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -44,15 +45,25 @@
 </div>
 
 <script>
+    // Inilagay ang iyong API Key
     const MY_KEY = "AIzaSyBprGO0cDuLsGVFHka52yxYUJ1_iCMPk9I";
 
     async function callGemini(prompt) {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${MY_KEY}`;
+        
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }]
+            })
         });
+
+        if (!response.ok) {
+            const errJson = await response.json();
+            throw new Error(errJson.error ? errJson.error.message : "Unknown API Error");
+        }
+
         const data = await response.json();
         return data.candidates[0].content.parts[0].text;
     }
@@ -62,46 +73,31 @@
         const btn = this;
         const status = document.getElementById('status');
 
-        if(!notes) return alert("Pakilagay ang observation notes.");
+        if(!notes) {
+            alert("Pakilagay ang observation notes.");
+            return;
+        }
 
         btn.disabled = true;
-        status.innerText = "⏳ AI is processing evidence-based report...";
+        status.innerHTML = `<span style="color: #1a5276;">⏳ Kasalukuyang pinoproseso ang report...</span>`;
 
         const masterPrompt = `
-        ROLE: Expert in Instructional Supervision assisting a Philippine School Head[cite: 4].
-        NON-NEGOTIABLE RULES: 
-        1. Use classroom-observable evidence only[cite: 9]. 
-        2. Do not infer intentions or motives[cite: 10]. 
-        3. If evidence is absent, mark NE[cite: 11]. 
-        4. No theory or motivational language[cite: 14].
+        Role: Expert in Instructional Supervision [cite: 3-7]
+        Non-Negotiable Rules: Use classroom-observable evidence only. No theory or motivational language. [cite: 8-15]
+        Rating Rules:
+        - If Career Stage = Proficient (T1–T3), allowed ratings: 3, 4, 5, 6, 7 [cite: 17-18]
+        - If Career Stage = Highly Proficient (MT1–MT4), allowed ratings: 4, 5, 6, 7, 8 [cite: 19-20]
         
-        RATING RULES: 
-        - If Career Stage is Proficient (T1-T3), allowed ratings are 3, 4, 5, 6, 7[cite: 17, 18].
-        - If Career Stage is Highly Proficient (MT1-MT4), allowed ratings are 4, 5, 6, 7, 8[cite: 19, 20].
-        
-        ADMIN DETAILS:
+        Admin Details:
         School: ${document.getElementById('schoolName').value}
-        School Head: ${document.getElementById('schoolHead').value}
+        Head: ${document.getElementById('schoolHead').value}
         Teacher: ${document.getElementById('teacherName').value}
-        Stage: ${document.getElementById('careerStage').value}
         Subject: ${document.getElementById('subject').value}
         Date: ${document.getElementById('obsDate').value}
         
-        RAW NOTES: ${notes} [cite: 33-46]
+        Notes: ${notes}
         
-        OUTPUT STRUCTURE: Follow sections 1 to 12 exactly [cite: 47-96].
-        1. Instructional Snapshot [cite: 49]
-        2. Observation Evidence Log [cite: 51]
-        3. PPST Rating Table [cite: 53, 54]
-        4. Synthesis of Instructional Patterns [cite: 60]
-        5. Critical Instructional Incidents [cite: 62]
-        6. Key Instructional Strengths [cite: 68]
-        7. Priority Instructional Gaps [cite: 73]
-        8. Post-Observation Conference Guide [cite: 78]
-        9. Technical Assistance (TA) Action Plan [cite: 85]
-        10. Performance Level Clarification [cite: 88]
-        11. School Head PPSSH Alignment [cite: 90]
-        12. RPMS Portfolio Guidance [cite: 95]
+        Task: Generate a full report following sections 1 to 12 exactly as defined in the master prompt. [cite: 47-96]
         `;
 
         try {
@@ -120,10 +116,10 @@
             });
 
             const blob = await Packer.toBlob(doc);
-            saveAs(blob, `IS_Report_${document.getElementById('teacherName').value}.docx`);
-            status.innerText = "✅ Report Downloaded!";
+            saveAs(blob, `IS_Report_${document.getElementById('teacherName').value || 'Output'}.docx`);
+            status.innerHTML = `<span style="color: #27ae60;">✅ Report Downloaded Successfully!</span>`;
         } catch (err) {
-            status.innerText = "❌ Error in processing.";
+            status.innerHTML = `<div class="error-msg">❌ Error: ${err.message}<br><small>Subukan ulit pagkalipas ng 1 minuto.</small></div>`;
             console.error(err);
         } finally {
             btn.disabled = false;
