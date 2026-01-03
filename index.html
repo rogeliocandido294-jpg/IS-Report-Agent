@@ -10,12 +10,11 @@
         :root { --primary: #1a5276; --secondary: #27ae60; --bg: #f4f7f6; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); padding: 20px; }
         .container { max-width: 850px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 5px 25px rgba(0,0,0,0.1); }
-        h1 { color: var(--primary); text-align: center; border-bottom: 3px solid var(--primary); padding-bottom: 10px; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; }
         label { font-weight: bold; font-size: 0.9rem; color: #2c3e50; }
         input, select, textarea { width: 100%; padding: 12px; border: 1px solid #bdc3c7; border-radius: 6px; box-sizing: border-box; margin-top: 5px; }
         .full-width { grid-column: span 2; }
-        button { background: var(--secondary); color: white; padding: 18px; border: none; border-radius: 6px; width: 100%; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 25px; transition: 0.3s; }
+        button { background: var(--secondary); color: white; padding: 18px; border: none; border-radius: 6px; width: 100%; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 25px; }
         #status { margin-top: 15px; font-weight: bold; text-align: center; }
         .error-msg { color: #e74c3c; background: #fdedec; padding: 10px; border-radius: 5px; border: 1px solid #e74c3c; margin-top: 10px; font-size: 13px; }
     </style>
@@ -23,12 +22,12 @@
 <body>
 
 <div class="container">
-    <h1>📝 IS Report Agent</h1>
+    <h1 style="text-align: center; color: var(--primary);">📝 IS Report Agent</h1>
     <div class="grid">
-        <div class="form-group full-width"><label>Name of School:</label><input type="text" id="schoolName" placeholder="Enter School Name"></div>
-        <div class="form-group"><label>School Head:</label><input type="text" id="schoolHead" placeholder="Enter School Head"></div>
-        <div class="form-group"><label>Teacher Name:</label><input type="text" id="teacherName" placeholder="Enter Teacher Name"></div>
-        <div class="form-group"><label>Subject / Grade Level:</label><input type="text" id="subject" placeholder="e.g. Science 4"></div>
+        <div class="form-group full-width"><label>Name of School:</label><input type="text" id="schoolName"></div>
+        <div class="form-group"><label>School Head:</label><input type="text" id="schoolHead"></div>
+        <div class="form-group"><label>Teacher Name:</label><input type="text" id="teacherName"></div>
+        <div class="form-group"><label>Subject / Grade Level:</label><input type="text" id="subject"></div>
         <div class="form-group">
             <label>Career Stage:</label>
             <select id="careerStage">
@@ -46,32 +45,35 @@
 <script>
     const MY_KEY = "AIzaSyBprGO0cDuLsGVFHka52yxYUJ1_iCMPk9I";
 
-    async function callAI(prompt) {
-        // Ginagamit ang 'v1' at pinalitan ang model path para sa global compatibility
-        const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${MY_KEY}`;
-        
+    async function tryModel(modelName, apiVersion, prompt) {
+        const url = `https://generativelanguage.googleapis.com/${apiVersion}/models/${modelName}:generateContent?key=${MY_KEY}`;
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }]
-            })
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
         });
-
+        if (!response.ok) throw new Error(modelName + " failed");
         const data = await response.json();
-        if (!response.ok) {
-            // Kung ayaw pa rin sa 'v1', susubukan nito ang 'v1beta' na may ibang path format
-            const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${MY_KEY}`;
-            const fallbackResponse = await fetch(fallbackUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-            });
-            const fallbackData = await fallbackResponse.json();
-            if (!fallbackResponse.ok) throw new Error(fallbackData.error.message);
-            return fallbackData.candidates[0].content.parts[0].text;
-        }
         return data.candidates[0].content.parts[0].text;
+    }
+
+    async function callAI(prompt) {
+        // Listahan ng lahat ng posibleng model name na pwedeng gumana sa key mo
+        const models = [
+            { name: "gemini-1.5-flash", ver: "v1beta" },
+            { name: "gemini-pro", ver: "v1beta" },
+            { name: "gemini-1.5-flash", ver: "v1" },
+            { name: "gemini-1.5-pro", ver: "v1beta" }
+        ];
+
+        for (let model of models) {
+            try {
+                return await tryModel(model.name, model.ver, prompt);
+            } catch (e) {
+                console.log("Skipping " + model.name);
+            }
+        }
+        throw new Error("Lahat ng AI models ay hindi mahanap. Pakitingnan kung active ang API Key sa Google AI Studio.");
     }
 
     document.getElementById('genBtn').onclick = async function() {
@@ -79,12 +81,12 @@
         const teacher = document.getElementById('teacherName').value;
         const status = document.getElementById('status');
         
-        if(!notes || !teacher) return alert("Paki-fill up ang Teacher Name at Notes.");
+        if(!notes || !teacher) return alert("Punan ang Teacher Name at Notes.");
         
         this.disabled = true;
-        status.innerHTML = "⏳ Pag-aanalisa sa ebidensya...";
+        status.innerHTML = "⏳ Naghahanap ng gumaganang AI model...";
 
-        const masterPrompt = `Role: Expert in Instructional Supervision[cite: 101]. Task: Produce evidence-based reports[cite: 104]. Rules: Observable evidence only[cite: 106]. Career Stage: ${document.getElementById('careerStage').value}. Ratings: 3-7 for P, 4-8 for HP . Admin: School: ${document.getElementById('schoolName').value}, Teacher: ${teacher}. Notes: ${notes}. Output: Generate sections 1 to 12 exactly [cite: 144-193].`;
+        const masterPrompt = `Role: Expert Instructional Supervisor[cite: 101]. Rules: Evidence-based only [cite: 105-111]. Ratings: ${document.getElementById('careerStage').value === 'Proficient (T1–T3)' ? '3-7' : '4-8'} [cite: 113-117]. Admin: School: ${document.getElementById('schoolName').value}, Teacher: ${teacher}. Notes: ${notes}. Output: Sections 1-12 .`;
 
         try {
             const aiText = await callAI(masterPrompt);
@@ -101,7 +103,7 @@
             saveAs(blob, `IS_Report_${teacher}.docx`);
             status.innerHTML = "✅ Downloaded!";
         } catch (err) {
-            status.innerHTML = `<div class="error-msg">❌ Error: ${err.message}<br>Tip: Subukan i-click ang button muli.</div>`;
+            status.innerHTML = `<div class="error-msg">❌ Error: ${err.message}</div>`;
         } finally {
             this.disabled = false;
         }
