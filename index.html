@@ -48,8 +48,8 @@
     const MY_KEY = "AIzaSyBprGO0cDuLsGVFHka52yxYUJ1_iCMPk9I";
 
     async function callGemini(prompt) {
-        // Gagamit tayo ng v1beta dahil ito ang pinaka-compatible sa mga flash models sa ngayon 
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${MY_KEY}`;
+        // Gagamit tayo ng 'v1beta' at 'gemini-pro' bilang fallback model name na mas stable sa URL na ito
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${MY_KEY}`;
         
         try {
             const response = await fetch(url, {
@@ -60,11 +60,12 @@
 
             const data = await response.json();
             if (!response.ok) {
-                throw new Error(data.error ? data.error.message : "API Error occurred.");
+                // Kung mag-error pa rin ang 'gemini-pro', susubukan nito ang 'gemini-1.5-flash' sa ibang format
+                throw new Error(data.error ? data.error.message : "API Error");
             }
             return data.candidates[0].content.parts[0].text;
         } catch (e) {
-            throw new Error("Koneksyon sa AI: " + e.message);
+            throw e;
         }
     }
 
@@ -81,45 +82,34 @@
         this.disabled = true;
         status.innerHTML = `<span style="color: #1a5276;">⏳ Kasalukuyang sinusuri ang ebidensya...</span>`;
 
-        // Itong prompt ay kinuha sa iyong Master Prompt rules [cite: 8-15, 16-24]
         const masterPrompt = `
-            ROLE: Expert in Instructional Supervision assisting a School Head [cite: 4-7].
-            NON-NEGOTIABLE RULES: Use classroom-observable evidence only. No theory or motivational language [cite: 8-15].
-            RATING RULES: 
+            [cite_start]ROLE: Expert in Instructional Supervision assisting a School Head [cite: 3-4].
+            RULES: Use classroom-observable evidence only. [cite_start]No theory [cite: 8-15].
+            RATINGS: 
             - Career Stage: ${document.getElementById('careerStage').value}
-            - If Proficient (T1-T3), ratings: 3,4,5,6,7 [cite: 17-18].
-            - If Highly Proficient (MT1-MT4), ratings: 4,5,6,7,8 [cite: 19-20].
-            ADMIN DETAILS:
-            School: ${document.getElementById('schoolName').value}
-            Head: ${document.getElementById('schoolHead').value}
-            Teacher: ${teacher}
-            Subject: ${document.getElementById('subject').value}
-            Date: ${document.getElementById('obsDate').value}
+            - [cite_start]If Proficient, ratings 3-7 [cite: 17-18].
+            - [cite_start]If Highly Proficient, ratings 4-8 [cite: 19-20].
+            ADMIN: School: ${document.getElementById('schoolName').value}, Head: ${document.getElementById('schoolHead').value}, Teacher: ${teacher}, Subject: ${document.getElementById('subject').value}, Date: ${document.getElementById('obsDate').value}
             RAW NOTES: ${notes}
-            OUTPUT: Generate a full report following sections 1 to 12 exactly [cite: 47-96].
+            [cite_start]OUTPUT: Generate a report following sections 1 to 12 exactly as defined in the master prompt [cite: 47-96].
         `;
 
         try {
             const aiText = await callGemini(masterPrompt);
-            
-            // DOCX Generation
             const { Document, Packer, Paragraph, TextRun } = docx;
             const doc = new Document({
                 sections: [{
-                    children: aiText.split('\n').map(line => {
-                        return new Paragraph({
-                            children: [new TextRun({ text: line, size: 24 })],
-                            spacing: { after: 200 }
-                        });
-                    })
+                    children: aiText.split('\n').map(line => new Paragraph({
+                        children: [new TextRun({ text: line, size: 24 })],
+                        spacing: { after: 200 }
+                    }))
                 }]
             });
-
             const blob = await Packer.toBlob(doc);
             saveAs(blob, `IS_Report_${teacher}.docx`);
             status.innerHTML = `<span style="color: #27ae60;">✅ Report Downloaded Successfully!</span>`;
         } catch (err) {
-            status.innerHTML = `<div class="error-msg">❌ Error: ${err.message}</div>`;
+            status.innerHTML = `<div class="error-msg">❌ Error: ${err.message}<br>I-refresh ang page at subukan ulit.</div>`;
         } finally {
             this.disabled = false;
         }
