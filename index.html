@@ -2,33 +2,49 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DepEd Instructional Supervision Tool</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/docx/7.1.0/docx.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <style>
         :root { --primary: #1a5276; --secondary: #27ae60; --bg: #f4f7f6; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); padding: 20px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); padding: 20px; color: #333; }
         .container { max-width: 900px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 5px 25px rgba(0,0,0,0.1); }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; }
+        h1 { color: var(--primary); text-align: center; border-bottom: 3px solid var(--primary); padding-bottom: 10px; margin-bottom: 30px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         label { font-weight: bold; font-size: 0.9rem; color: #2c3e50; }
-        input, select, textarea { width: 100%; padding: 12px; border: 1px solid #bdc3c7; border-radius: 6px; box-sizing: border-box; margin-top: 5px; }
+        input, select, textarea { width: 100%; padding: 12px; border: 1px solid #bdc3c7; border-radius: 6px; box-sizing: border-box; margin-top: 5px; font-size: 14px; }
         .full-width { grid-column: span 2; }
+        textarea { resize: vertical; min-height: 200px; }
         button { background: var(--secondary); color: white; padding: 18px; border: none; border-radius: 6px; width: 100%; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 25px; transition: 0.3s; }
-        button:disabled { background: #bdc3c7; cursor: not-allowed; }
-        #status { margin-top: 15px; font-weight: bold; text-align: center; }
-        .error-msg { color: #e74c3c; background: #fdedec; padding: 10px; border-radius: 5px; border: 1px solid #e74c3c; margin-top: 10px; }
+        button:hover { background: #219150; transform: translateY(-2px); }
+        button:disabled { background: #bdc3c7; cursor: not-allowed; transform: none; }
+        #status { margin-top: 15px; font-weight: bold; text-align: center; min-height: 20px; }
+        .error-msg { color: #e74c3c; background: #fdedec; padding: 15px; border-radius: 5px; border: 1px solid #e74c3c; margin-top: 10px; font-size: 14px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1 style="text-align: center; color: var(--primary);">📋 IS Report Agent</h1>
+    <h1>📋 IS Report Agent</h1>
     
     <div class="grid">
-        <div class="form-group full-width"><label>Name of School:</label><input type="text" id="schoolName" placeholder="Enter School Name"></div>
-        <div class="form-group"><label>School Head:</label><input type="text" id="schoolHead" placeholder="Enter Name of School Head"></div>
-        <div class="form-group"><label>Teacher Name:</label><input type="text" id="teacherName" placeholder="Enter Teacher Name"></div>
-        <div class="form-group"><label>Subject / Grade Level:</label><input type="text" id="subject" placeholder="e.g. Mathematics / Grade 3"></div>
+        <div class="form-group full-width">
+            <label>Name of School:</label>
+            <input type="text" id="schoolName" placeholder="Enter School Name">
+        </div>
+        <div class="form-group">
+            <label>School Head:</label>
+            <input type="text" id="schoolHead" placeholder="Enter Name of School Head">
+        </div>
+        <div class="form-group">
+            <label>Teacher Name:</label>
+            <input type="text" id="teacherName" placeholder="Enter Teacher Name">
+        </div>
+        <div class="form-group">
+            <label>Subject / Grade Level:</label>
+            <input type="text" id="subject" placeholder="e.g. Mathematics / Grade 3">
+        </div>
         <div class="form-group">
             <label>Career Stage:</label>
             <select id="careerStage">
@@ -36,20 +52,27 @@
                 <option value="Highly Proficient (MT1–MT4)">Highly Proficient (MT1–MT4)</option>
             </select>
         </div>
-        <div class="form-group"><label>Date of Observation:</label><input type="date" id="obsDate"></div>
-        <div class="form-group full-width"><label>Raw Observation Notes:</label><textarea id="obsNotes" rows="12" placeholder="Paste observation notes here..."></textarea></div>
+        <div class="form-group">
+            <label>Date of Observation:</label>
+            <input type="date" id="obsDate">
+        </div>
+        <div class="form-group full-width">
+            <label>Raw Classroom Observation Notes:</label>
+            <textarea id="obsNotes" placeholder="I-paste dito ang lahat ng na-obserbahan sa loob ng classroom..."></textarea>
+        </div>
     </div>
 
-    <button id="genBtn">🚀 GENERATE WORD REPORT</button>
+    <button id="genBtn">🚀 GENERATE & DOWNLOAD WORD REPORT</button>
     <div id="status"></div>
 </div>
 
 <script>
-    // Inilagay ang iyong API Key
+    // Inilagay ang iyong working API Key
     const MY_KEY = "AIzaSyBprGO0cDuLsGVFHka52yxYUJ1_iCMPk9I";
 
     async function callGemini(prompt) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${MY_KEY}`;
+        // Updated Endpoint: Ginamit ang v1 at flash-latest para sa stability
+        const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${MY_KEY}`;
         
         const response = await fetch(url, {
             method: 'POST',
@@ -61,43 +84,52 @@
 
         if (!response.ok) {
             const errJson = await response.json();
-            throw new Error(errJson.error ? errJson.error.message : "Unknown API Error");
+            throw new Error(errJson.error ? errJson.error.message : "Connection Error");
         }
 
         const data = await response.json();
+        if (!data.candidates || data.candidates.length === 0) {
+            throw new Error("No response from AI. Try again.");
+        }
         return data.candidates[0].content.parts[0].text;
     }
 
     document.getElementById('genBtn').onclick = async function() {
         const notes = document.getElementById('obsNotes').value;
+        const teacher = document.getElementById('teacherName').value;
+        const stage = document.getElementById('careerStage').value;
         const btn = this;
         const status = document.getElementById('status');
 
-        if(!notes) {
-            alert("Pakilagay ang observation notes.");
+        if(!notes || !teacher) {
+            alert("Pakisuyong punan ang Teacher Name at Observation Notes.");
             return;
         }
 
         btn.disabled = true;
-        status.innerHTML = `<span style="color: #1a5276;">⏳ Kasalukuyang pinoproseso ang report...</span>`;
+        status.innerHTML = `<span style="color: #1a5276;">⏳ Kasalukuyang sinusuri ang ebidensya...</span>`;
 
+        // Prompt logic based on the Master Prompt requirements [cite: 8-24, 47-96]
         const masterPrompt = `
-        Role: Expert in Instructional Supervision [cite: 3-7]
-        Non-Negotiable Rules: Use classroom-observable evidence only. No theory or motivational language. [cite: 8-15]
-        Rating Rules:
-        - If Career Stage = Proficient (T1–T3), allowed ratings: 3, 4, 5, 6, 7 [cite: 17-18]
-        - If Career Stage = Highly Proficient (MT1–MT4), allowed ratings: 4, 5, 6, 7, 8 [cite: 19-20]
+        Role: Expert in Instructional Supervision assisting a Philippine School Head[cite: 4, 7].
+        Non-Negotiable Rules: Use classroom-observable evidence only. No theory or motivational language [cite: 8-15].
         
-        Admin Details:
+        Rating Rules:
+        - If Career Stage = Proficient (T1–T3), allowed ratings: 3, 4, 5, 6, 7 [cite: 17-18].
+        - If Career Stage = Highly Proficient (MT1–MT4), allowed ratings: 4, 5, 6, 7, 8 [cite: 19-20].
+        - If evidence is absent, mark NE[cite: 11].
+        
+        Details:
         School: ${document.getElementById('schoolName').value}
         Head: ${document.getElementById('schoolHead').value}
-        Teacher: ${document.getElementById('teacherName').value}
+        Teacher: ${teacher}
         Subject: ${document.getElementById('subject').value}
         Date: ${document.getElementById('obsDate').value}
         
-        Notes: ${notes}
+        Observation Notes: ${notes}
         
-        Task: Generate a full report following sections 1 to 12 exactly as defined in the master prompt. [cite: 47-96]
+        Output Structure: Generate the report following sections 1 to 12 strictly as defined in the master prompt . 
+        Ensure Section 3 (Rating Table) and Section 9 (TA Action Plan) are detailed and evidence-based.
         `;
 
         try {
@@ -116,15 +148,16 @@
             });
 
             const blob = await Packer.toBlob(doc);
-            saveAs(blob, `IS_Report_${document.getElementById('teacherName').value || 'Output'}.docx`);
+            saveAs(blob, `IS_Report_${teacher}.docx`);
             status.innerHTML = `<span style="color: #27ae60;">✅ Report Downloaded Successfully!</span>`;
         } catch (err) {
-            status.innerHTML = `<div class="error-msg">❌ Error: ${err.message}<br><small>Subukan ulit pagkalipas ng 1 minuto.</small></div>`;
+            status.innerHTML = `<div class="error-msg">❌ Error: ${err.message}<br><small>I-refresh ang page at subukan ulit.</small></div>`;
             console.error(err);
         } finally {
             btn.disabled = false;
         }
     };
 </script>
+
 </body>
 </html>
