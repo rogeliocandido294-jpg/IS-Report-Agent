@@ -15,9 +15,10 @@
         label { font-weight: bold; font-size: 0.9rem; color: #2c3e50; }
         input, select, textarea { width: 100%; padding: 12px; border: 1px solid #bdc3c7; border-radius: 6px; box-sizing: border-box; margin-top: 5px; }
         .full-width { grid-column: span 2; }
-        button { background: var(--secondary); color: white; padding: 18px; border: none; border-radius: 6px; width: 100%; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 25px; }
-        #status { margin-top: 15px; font-weight: bold; text-align: center; }
-        .error-box { color: #e74c3c; background: #fdedec; padding: 15px; border-radius: 5px; border: 1px solid #e74c3c; margin-top: 10px; }
+        button { background: var(--secondary); color: white; padding: 18px; border: none; border-radius: 6px; width: 100%; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 25px; transition: 0.3s; }
+        button:disabled { background: #bdc3c7; cursor: not-allowed; }
+        #status { margin-top: 15px; font-weight: bold; text-align: center; min-height: 24px; }
+        .error-msg { color: #e74c3c; background: #fdedec; padding: 10px; border-radius: 5px; border: 1px solid #e74c3c; margin-top: 10px; font-size: 13px; }
     </style>
 </head>
 <body>
@@ -25,10 +26,10 @@
 <div class="container">
     <h1>📝 IS Report Agent</h1>
     <div class="grid">
-        <div class="form-group full-width"><label>Name of School:</label><input type="text" id="schoolName"></div>
-        <div class="form-group"><label>School Head:</label><input type="text" id="schoolHead"></div>
-        <div class="form-group"><label>Teacher Name:</label><input type="text" id="teacherName"></div>
-        <div class="form-group"><label>Subject / Grade Level:</label><input type="text" id="subject"></div>
+        <div class="form-group full-width"><label>Name of School:</label><input type="text" id="schoolName" placeholder="Pangalan ng Paaralan"></div>
+        <div class="form-group"><label>School Head:</label><input type="text" id="schoolHead" placeholder="Pangalan ng School Head"></div>
+        <div class="form-group"><label>Teacher Name:</label><input type="text" id="teacherName" placeholder="Pangalan ng Guro"></div>
+        <div class="form-group"><label>Subject / Grade Level:</label><input type="text" id="subject" placeholder="e.g. Science 4"></div>
         <div class="form-group">
             <label>Career Stage:</label>
             <select id="careerStage">
@@ -37,7 +38,7 @@
             </select>
         </div>
         <div class="form-group"><label>Date of Observation:</label><input type="date" id="obsDate"></div>
-        <div class="form-group full-width"><label>Observation Notes:</label><textarea id="obsNotes" rows="10"></textarea></div>
+        <div class="form-group full-width"><label>Observation Notes:</label><textarea id="obsNotes" rows="10" placeholder="I-paste dito ang notes..."></textarea></div>
     </div>
     <button id="genBtn">🚀 GENERATE & DOWNLOAD WORD REPORT</button>
     <div id="status"></div>
@@ -47,18 +48,24 @@
     const MY_KEY = "AIzaSyBprGO0cDuLsGVFHka52yxYUJ1_iCMPk9I";
 
     async function callGemini(prompt) {
-        // Binago ang endpoint sa v1beta at inayos ang model name
+        // Gagamit tayo ng v1beta dahil ito ang pinaka-compatible sa mga flash models sa ngayon 
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${MY_KEY}`;
         
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-        });
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+            });
 
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error ? data.error.message : "API Error");
-        return data.candidates[0].content.parts[0].text;
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error ? data.error.message : "API Error occurred.");
+            }
+            return data.candidates[0].content.parts[0].text;
+        } catch (e) {
+            throw new Error("Koneksyon sa AI: " + e.message);
+        }
     }
 
     document.getElementById('genBtn').onclick = async function() {
@@ -66,22 +73,53 @@
         const teacher = document.getElementById('teacherName').value;
         const status = document.getElementById('status');
         
-        if(!notes || !teacher) return alert("Punan ang lahat ng fields.");
+        if(!notes || !teacher) {
+            alert("Pakisuyong punan ang Teacher Name at Observation Notes.");
+            return;
+        }
         
         this.disabled = true;
-        status.innerHTML = "⏳ Generating Report...";
+        status.innerHTML = `<span style="color: #1a5276;">⏳ Kasalukuyang sinusuri ang ebidensya...</span>`;
 
-        [cite_start]const masterPrompt = `Role: Expert in Instructional Supervision[cite: 3]. [cite_start]Rules: Classroom-observable evidence only[cite: 9]. Admin Details: School: ${document.getElementById('schoolName').value}, Head: ${document.getElementById('schoolHead').value}, Teacher: ${teacher}, Stage: ${document.getElementById('careerStage').value}. Notes: ${notes}. [cite_start]Output: Follow sections 1-12 [cite: 47-96]. [cite_start]Ratings: 3-7 for Proficient, 4-8 for Highly Proficient [cite: 17-20].`;
+        // Itong prompt ay kinuha sa iyong Master Prompt rules [cite: 8-15, 16-24]
+        const masterPrompt = `
+            ROLE: Expert in Instructional Supervision assisting a School Head [cite: 4-7].
+            NON-NEGOTIABLE RULES: Use classroom-observable evidence only. No theory or motivational language [cite: 8-15].
+            RATING RULES: 
+            - Career Stage: ${document.getElementById('careerStage').value}
+            - If Proficient (T1-T3), ratings: 3,4,5,6,7 [cite: 17-18].
+            - If Highly Proficient (MT1-MT4), ratings: 4,5,6,7,8 [cite: 19-20].
+            ADMIN DETAILS:
+            School: ${document.getElementById('schoolName').value}
+            Head: ${document.getElementById('schoolHead').value}
+            Teacher: ${teacher}
+            Subject: ${document.getElementById('subject').value}
+            Date: ${document.getElementById('obsDate').value}
+            RAW NOTES: ${notes}
+            OUTPUT: Generate a full report following sections 1 to 12 exactly [cite: 47-96].
+        `;
 
         try {
             const aiText = await callGemini(masterPrompt);
+            
+            // DOCX Generation
             const { Document, Packer, Paragraph, TextRun } = docx;
-            const doc = new Document({ sections: [{ children: aiText.split('\n').map(l => new Paragraph({ children: [new TextRun(l)] })) }] });
+            const doc = new Document({
+                sections: [{
+                    children: aiText.split('\n').map(line => {
+                        return new Paragraph({
+                            children: [new TextRun({ text: line, size: 24 })],
+                            spacing: { after: 200 }
+                        });
+                    })
+                }]
+            });
+
             const blob = await Packer.toBlob(doc);
-            saveAs(blob, "IS_Report.docx");
-            status.innerHTML = "✅ Downloaded!";
+            saveAs(blob, `IS_Report_${teacher}.docx`);
+            status.innerHTML = `<span style="color: #27ae60;">✅ Report Downloaded Successfully!</span>`;
         } catch (err) {
-            status.innerHTML = `<div class="error-box">❌ Error: ${err.message}</div>`;
+            status.innerHTML = `<div class="error-msg">❌ Error: ${err.message}</div>`;
         } finally {
             this.disabled = false;
         }
