@@ -4,112 +4,114 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DepEd IS Report Agent</title>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/docx/7.1.0/docx.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
     <style>
         :root { --primary: #1a5276; --secondary: #27ae60; --bg: #f4f7f6; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); padding: 20px; }
         .container { max-width: 850px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 5px 25px rgba(0,0,0,0.1); }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; }
         label { font-weight: bold; font-size: 0.9rem; color: #2c3e50; }
-        input, select, textarea { width: 100%; padding: 12px; border: 1px solid #bdc3c7; border-radius: 6px; box-sizing: border-box; margin-top: 5px; }
+        input, select, textarea { width: 100%; padding: 12px; border: 1px solid #bdc3c7; border-radius: 6px; margin-top: 5px; }
         .full-width { grid-column: span 2; }
-        button { background: var(--secondary); color: white; padding: 18px; border: none; border-radius: 6px; width: 100%; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 25px; transition: 0.3s; }
+        button { background: var(--secondary); color: white; padding: 18px; border: none; border-radius: 6px; width: 100%; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 25px; }
         #status { margin-top: 15px; font-weight: bold; text-align: center; color: #1a5276; }
-        .error-msg { color: #e74c3c; background: #fdedec; padding: 10px; border-radius: 5px; border: 1px solid #e74c3c; margin-top: 10px; font-size: 13px; text-align: left; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1 style="text-align: center; color: var(--primary);">📋 IS Report Agent</h1>
+    <h1 style="text-align:center;color:var(--primary);">📋 IS Report Agent</h1>
+
     <div class="grid">
-        <div class="form-group full-width"><label>Name of School:</label><input type="text" id="schoolName"></div>
-        <div class="form-group"><label>School Head:</label><input type="text" id="schoolHead"></div>
-        <div class="form-group"><label>Teacher Name:</label><input type="text" id="teacherName"></div>
-        <div class="form-group"><label>Subject / Grade Level:</label><input type="text" id="subject"></div>
-        <div class="form-group">
+        <div class="full-width">
+            <label>Name of School:</label>
+            <input type="text" id="schoolName">
+        </div>
+        <div>
+            <label>School Head:</label>
+            <input type="text" id="schoolHead">
+        </div>
+        <div>
+            <label>Teacher Name:</label>
+            <input type="text" id="teacherName">
+        </div>
+        <div>
+            <label>Subject / Grade Level:</label>
+            <input type="text" id="subject">
+        </div>
+        <div>
             <label>Career Stage:</label>
             <select id="careerStage">
-                <option value="Proficient (T1–T3)">Proficient (T1–T3)</option>
-                <option value="Highly Proficient (MT1–MT4)">Highly Proficient (MT1–MT4)</option>
+                <option>Proficient (T1–T3)</option>
+                <option>Highly Proficient (MT1–MT4)</option>
             </select>
         </div>
-        <div class="form-group"><label>Date of Observation:</label><input type="date" id="obsDate"></div>
-        <div class="form-group full-width"><label>Observation Notes:</label><textarea id="obsNotes" rows="10" placeholder="I-paste dito ang iyong notes..."></textarea></div>
+        <div>
+            <label>Date of Observation:</label>
+            <input type="date" id="obsDate">
+        </div>
+        <div class="full-width">
+            <label>Observation Notes:</label>
+            <textarea id="obsNotes" rows="10"></textarea>
+        </div>
     </div>
-    <button id="genBtn">🚀 GENERATE & DOWNLOAD WORD REPORT</button>
+
+    <button id="genBtn">📄 GENERATE WORD REPORT</button>
     <div id="status"></div>
 </div>
 
 <script>
-    const MY_KEY = "BAGONG_API_KEY";
+document.getElementById('genBtn').onclick = async function () {
 
-    // Ito ang "Bulletproof" function na susubok sa iba't ibang URL hanggang sa gumana
-    async function callAIWithFallback(prompt) {
-        // Listahan ng mga susubukang URL (v1beta at v1)
-        const endpoints = [
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${MY_KEY}`,
-            `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${MY_KEY}`,
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${MY_KEY}`
-        ];
+    const school = document.getElementById('schoolName').value;
+    const head = document.getElementById('schoolHead').value;
+    const teacher = document.getElementById('teacherName').value;
+    const subject = document.getElementById('subject').value;
+    const stage = document.getElementById('careerStage').value;
+    const date = document.getElementById('obsDate').value;
+    const notes = document.getElementById('obsNotes').value;
+    const status = document.getElementById('status');
 
-        let lastError = "";
-        for (let url of endpoints) {
-            try {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    return data.candidates[0].content.parts[0].text;
-                } else {
-                    const errData = await response.json();
-                    lastError = errData.error.message;
-                }
-            } catch (e) {
-                lastError = e.message;
-            }
-        }
-        throw new Error(lastError || "Hindi makakonekta sa AI. Pakisigurado na ang API key ay active.");
+    if (!teacher || !notes) {
+        alert("Teacher Name at Observation Notes ay required.");
+        return;
     }
 
-    document.getElementById('genBtn').onclick = async function() {
-        const notes = document.getElementById('obsNotes').value;
-        const teacher = document.getElementById('teacherName').value;
-        const status = document.getElementById('status');
-        
-        if(!notes || !teacher) return alert("Pakisuyong punan ang Teacher Name at Notes.");
-        
-        this.disabled = true;
-        status.innerHTML = "⏳ Naghahanap ng koneksyon sa AI at sinusuri ang report...";
+    status.innerHTML = "⏳ Gumagawa ng Word report...";
 
-        // Logic base sa iyong Master Prompt
-        const masterPrompt = `Role: Expert in Instructional Supervision. Task: Produce evidence-based report. Rule: Observable evidence only. No theory. Ratings: ${document.getElementById('careerStage').value.includes('Proficient') ? '3-7' : '4-8'}. Admin: School: ${document.getElementById('schoolName').value}, Teacher: ${teacher}. Notes: ${notes}. Output: Generate sections 1 to 12 exactly based on the master prompt instructions.`;
+    const content = `
+INSTRUCTIONAL SUPERVISION REPORT
 
-        try {
-            const aiText = await callAIWithFallback(masterPrompt);
-            const { Document, Packer, Paragraph, TextRun } = docx;
-            const doc = new Document({
-                sections: [{
-                    children: aiText.split('\n').map(line => new Paragraph({
-                        children: [new TextRun({ text: line, size: 24 })],
-                        spacing: { after: 200 }
-                    }))
-                }]
-            });
-            const blob = await Packer.toBlob(doc);
-            saveAs(blob, `IS_Report_${teacher}.docx`);
-            status.innerHTML = "<span style='color:green'>✅ Tagumpay! Na-download na ang iyong Word file.</span>";
-        } catch (err) {
-            status.innerHTML = `<div class="error-msg">❌ Error: ${err.message}<br>Maaaring hindi pa fully active ang key mo sa Google. Subukan ulit pagkalipas ng 2 minuto.</div>`;
-        } finally {
-            this.disabled = false;
-        }
-    };
+School: ${school}
+School Head: ${head}
+Teacher: ${teacher}
+Subject / Grade: ${subject}
+Career Stage: ${stage}
+Date of Observation: ${date}
+
+OBSERVATION NOTES:
+${notes}
+`;
+
+    const { Document, Packer, Paragraph, TextRun } = docx;
+
+    const doc = new Document({
+        sections: [{
+            children: content.split("\n").map(line =>
+                new Paragraph({ children: [new TextRun(line)] })
+            )
+        }]
+    });
+
+    const blob = await Packer.toBlob(doc);
+    saveAs(blob, `IS_Report_${teacher}.docx`);
+
+    status.innerHTML = "✅ Word file generated successfully.";
+};
 </script>
+
 </body>
 </html>
